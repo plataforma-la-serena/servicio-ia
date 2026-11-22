@@ -15,7 +15,7 @@ function greeting(catalogUrl: string): string {
 }
 
 function reservation(): string {
-  return "Perfecto. Para iniciar la reserva, enviá una foto de tu DNI. Desde ahora te va a responder una persona del equipo para confirmar fechas y pago.";
+  return "Perfecto. Para iniciar la reserva, enviá tu nombre completo. Desde ahora te va a responder una persona del equipo para confirmar fechas y pago.";
 }
 
 function describeApartment(apartment: ApartmentContext): string {

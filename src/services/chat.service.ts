@@ -6,10 +6,10 @@ import { mockReply } from "./mock-reply.service";
 import { buildSystemPrompt } from "./prompt.service";
 
 const HANDOFF_SUFFIX =
-  "Para iniciar la reserva, enviá una foto de tu DNI. Una persona del equipo va a continuar la conversación.";
+  "Para iniciar la reserva, enviá tu nombre completo. Una persona del equipo va a continuar la conversación.";
 
 function ensureHandoff(reply: string): string {
-  if (/dni|documento/i.test(reply)) {
+  if (/nombre/i.test(reply)) {
     return reply;
   }
   return `${reply}\n\n${HANDOFF_SUFFIX}`;
