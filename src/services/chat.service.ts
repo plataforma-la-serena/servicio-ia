@@ -33,8 +33,11 @@ export class ChatService {
 
   async reply(input: ChatRequest): Promise<ChatResponse> {
     const intent = detectIntent(input.message);
-    const handoff = intent === "reservation";
     const rawReply = await this.generate(input, intent);
+    const asksForName = /\b(nombre completo|nombre y apellido|tu nombre)\b/i.test(
+      rawReply,
+    );
+    const handoff = intent === "reservation" || asksForName;
     const reply = handoff ? ensureHandoff(rawReply) : rawReply;
 
     return {

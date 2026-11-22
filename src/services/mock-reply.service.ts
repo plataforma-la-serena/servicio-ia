@@ -20,7 +20,7 @@ function reservation(): string {
 
 function describeApartment(apartment: ApartmentContext): string {
   const features = apartment.features.join(", ") || "sin características cargadas";
-  return `*${apartment.title}*\n- Precio: ${priceFormat.format(apartment.pricePerNight)} por noche\n- Capacidad: hasta ${apartment.capacity} personas\n- ${apartment.description}\n- Características: ${features}`;
+  return `*${apartment.title}*\n- Precio: ${priceFormat.format(apartment.pricePerNight)} CLP por noche\n- Capacidad: hasta ${apartment.capacity} personas\n- ${apartment.description}\n- Características: ${features}`;
 }
 
 function listBy(
@@ -47,7 +47,7 @@ function answerQuestion(request: ChatRequest, catalogUrl: string): string {
     return describeApartment(match);
   }
   if (/precio|valor|cuanto|costo/.test(text)) {
-    return `Precios por noche:\n${listBy(apartments, (item) => priceFormat.format(item.pricePerNight))}`;
+    return `Precios por noche:\n${listBy(apartments, (item) => `${priceFormat.format(item.pricePerNight)} CLP`)}`;
   }
   if (/capacidad|personas|cuantas/.test(text)) {
     return `Capacidad por departamento:\n${listBy(apartments, (item) => `hasta ${item.capacity} personas`)}`;
