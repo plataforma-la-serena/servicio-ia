@@ -12,6 +12,7 @@ export interface ApartmentContext {
   pricePerNight: number;
   capacity: number;
   features: string[];
+  images?: string[];
 }
 
 export interface ChatRequest {
@@ -26,4 +27,5 @@ export interface ChatResponse {
   intent: Intent;
   handoff: boolean;
   model: string;
+  apartmentIds: string[];
 }
