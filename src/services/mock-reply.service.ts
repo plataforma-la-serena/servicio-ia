@@ -20,7 +20,7 @@ function reservation(): string {
 
 function describeApartment(apartment: ApartmentContext): string {
   const features = apartment.features.join(", ") || "sin características cargadas";
-  return `${apartment.title}: ${priceFormat.format(apartment.pricePerNight)} por noche, hasta ${apartment.capacity} personas. ${apartment.description} Características: ${features}.`;
+  return `*${apartment.title}*\n- Precio: ${priceFormat.format(apartment.pricePerNight)} por noche\n- Capacidad: hasta ${apartment.capacity} personas\n- ${apartment.description}\n- Características: ${features}`;
 }
 
 function listBy(
@@ -58,7 +58,9 @@ function answerQuestion(request: ChatRequest, catalogUrl: string): string {
   if (/caracteristica|incluye|comodidad/.test(text)) {
     return `Características:\n${listBy(apartments, (item) => item.features.join(", ") || "sin datos")}`;
   }
-  return `Tenemos ${apartments.length} departamentos: ${apartments.map((item) => item.title).join(", ")}. ¿Te interesa alguno en particular o querés que te cuente precios y disponibilidad?`;
+  return `Tenemos ${apartments.length} departamentos:\n${apartments
+    .map((item) => `- ${item.title}: hasta ${item.capacity} personas`)
+    .join("\n")}\n\n¿Te interesa alguno en particular o querés que te cuente precios y disponibilidad?`;
 }
 
 export function mockReply(
