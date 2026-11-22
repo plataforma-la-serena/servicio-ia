@@ -32,7 +32,7 @@ export class NimLlmClient implements LlmClient {
         },
         body: JSON.stringify({
           model: this.config.nimModel,
-          temperature: 0.3,
+          temperature: 0.5,
           max_tokens: 400,
           messages: [
             { role: "system", content: system },

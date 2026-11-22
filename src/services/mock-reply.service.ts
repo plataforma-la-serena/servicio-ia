@@ -8,14 +8,14 @@ const priceFormat = new Intl.NumberFormat("es-CL", {
 });
 
 const OFF_TOPIC_REPLY =
-  "Solo puedo responder consultas sobre los departamentos y sobre La Serena. ¿Querés que te cuente qué departamentos hay disponibles?";
+  "Me encantaría ayudarte con eso, pero solo puedo responder sobre los departamentos y sobre La Serena. ¿Querés que te cuente qué hay disponible?";
 
 function greeting(catalogUrl: string): string {
-  return `Hola, soy el asistente virtual de La Serena. Podés ver el catálogo completo acá: ${catalogUrl}. ¿Buscás algo en particular?`;
+  return `¡Hola! Soy el asistente de La Serena 😊 Podés ver el catálogo completo acá: ${catalogUrl}. ¿Te ayudo a encontrar tu departamento ideal?`;
 }
 
 function reservation(): string {
-  return "Perfecto. Para iniciar la reserva, enviá tu nombre completo. Desde ahora te va a responder una persona del equipo para confirmar fechas y pago.";
+  return "¡Perfecto! Para iniciar la reserva, enviá tu nombre completo. Desde ahora te va a responder una persona del equipo para confirmar fechas y pago.";
 }
 
 function describeApartment(apartment: ApartmentContext): string {
@@ -58,7 +58,7 @@ function answerQuestion(request: ChatRequest, catalogUrl: string): string {
   if (/caracteristica|incluye|comodidad/.test(text)) {
     return `Características:\n${listBy(apartments, (item) => item.features.join(", ") || "sin datos")}`;
   }
-  return `En el catálogo hay ${apartments.length} departamentos: ${apartments.map((item) => item.title).join(", ")}. ¿Te interesa alguno en particular o querés consultar por precios y disponibilidad?`;
+  return `Tenemos ${apartments.length} departamentos: ${apartments.map((item) => item.title).join(", ")}. ¿Te interesa alguno en particular o querés que te cuente precios y disponibilidad?`;
 }
 
 export function mockReply(
