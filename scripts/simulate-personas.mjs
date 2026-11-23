@@ -362,7 +362,7 @@ const CITY_KEYWORDS =
   /(playa|faro|centro|clima|santiago|aeropuerto|shopping|actividades|restaurante|coquimbo|elqui|isla damas|seguridad|evento|artesan|observatorio|transporte|estacion|cajero|banco|lluvia|museo|comida|noche|farmacia|hospital|feria|mercado|gratis|caf[eé]|turismo|visitar|pasear|ciudad)/;
 
 const APARTMENT_KEYWORDS =
-  /(departamento|depto|precio|valor|cu[aá]nto sale|capacidad|personas|dormitorio|ba[nñ]o|cocina|balc[oó]n|estacionamiento|wifi|lavarropa|quincho|seguridad|mascota|pileta|aire|s[aá]bana|toalla|limpieza|dep[oó]sito|cancel|descuento|m[ií]nimo|check|fumar|ascensor|silla|vista|ropa de cama|secador|cochera|portero|reserv|quincho|juegos)/;
+  /(departamento|depto|precio|valor|cu[aá]nto sale|capacidad|personas|dormitorio|ba[nñ]o|cocina|balc[oó]n|estacionamiento|wifi|lavarropa|quincho|seguridad|mascota|pileta|aire|s[aá]bana|toalla|limpieza|dep[oó]sito|cancel|descuento|m[ií]nimo|check|fumar|ascensor|silla|vista|ropa de cama|secador|cochera|portero|reserv|quincho|juegos|busco|buscamos|alojamiento|quedarme)/;
 
 const UNKNOWN_POLICY =
   /(mascota|pileta|aire acondicionado|calefacci[oó]n|s[aá]bana|toalla|limpieza|dep[oó]sito|se[nñ]a|cancel|descuento|m[ií]nimo|check-in|check-out|fumar|ascensor|silla de ruedas|vista al mar|ropa de cama|secador|portero|cochera|tarjeta|transferencia|pago)/;
@@ -496,7 +496,12 @@ function evaluate(turn, data, previousWasNameRequest) {
     flags.push("mock_fallback");
   }
 
-  if (type === "city") {
+  const isGreeting =
+    /^(hola|holis|holi|buenas|buen dia|buenos dias|buenas tardes|buenas noches|que tal|hey)\b/.test(
+      normalize(turn.message),
+    );
+
+  if (type === "city" && !isGreeting) {
     if (/https?:\/\//.test(reply)) flags.push("city_url");
     if (/(departamento|depto|carlo magno|reserva|precio)/.test(text)) {
       flags.push("city_pitch");

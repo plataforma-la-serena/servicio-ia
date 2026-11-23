@@ -34,6 +34,14 @@ function isCityQuestion(message: string): boolean {
   return CITY_TOPIC.test(text) && !isCatalogRequest(message);
 }
 
+function withCatalogLink(reply: string, catalogUrl: string): string {
+  if (/https?:\/\//.test(reply)) {
+    return reply;
+  }
+
+  return `${reply.trim()}\n\nPodés ver la web con los departamentos acá: ${catalogUrl} 😊`;
+}
+
 const NAME_REQUEST_SUFFIX =
   "Para iniciar la reserva, enviame tu nombre completo 😊 Una persona del equipo va a continuar la conversación.";
 
@@ -493,6 +501,7 @@ export class ChatService {
     }
 
     let reply =
+      intent === "greeting" ||
       wantsReservation ||
       directAnswer !== null ||
       (!isCityQuestion(input.message) &&
@@ -503,6 +512,11 @@ export class ChatService {
 
     if (!reply.trim()) {
       reply = isCityQuestion(input.message) ? CITY_FALLBACK : GENERIC_FALLBACK;
+    }
+
+    // En el primer saludo de la conversación, adjuntar siempre el enlace del sitio.
+    if (intent === "greeting" && input.history.length === 0) {
+      reply = withCatalogLink(reply, this.config.catalogUrl);
     }
 
     return {

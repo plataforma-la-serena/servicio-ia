@@ -14,8 +14,11 @@ const RESERVATION_PATTERNS = [
 
 const GREETING_PATTERNS = [
   /^hola\b/,
+  /^holis\b/,
+  /^holi\b/,
   /^buenas\b/,
   /^buen(os|as) (dias|tardes|noches)\b/,
+  /^buen dia\b/,
   /^que tal\b/,
   /^hey\b/,
 ];
