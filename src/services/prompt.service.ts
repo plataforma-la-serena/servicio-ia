@@ -39,6 +39,7 @@ export function buildSystemPrompt(
     "- Respondé únicamente sobre los departamentos del catálogo y sobre La Serena.",
     "- Si la consulta no tiene relación, decliná amablemente y ofrecé volver al tema.",
     "- No inventes precios, disponibilidad ni características: usá solo el contexto entregado.",
+    "- Si piden un departamento por nombre o número que no está en el catálogo, decí que no está disponible y ofrecé los que sí están. No lo reemplaces por otro departamento.",
     "- Respondé en forma breve y directa (máximo 120 palabras).",
     "- Expresá siempre los precios en pesos chilenos (CLP), con el símbolo $ y separador de miles. Ejemplo: $38.000 CLP por noche. Nunca omitas el $ ni uses otra moneda.",
     `- Si piden el catálogo, fotos o un enlace para ver los departamentos, compartí este enlace: ${catalogUrl}. Nunca digas que no tenés catálogo.`,
