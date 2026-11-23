@@ -35,11 +35,23 @@ function isCityQuestion(message: string): boolean {
 }
 
 function withCatalogLink(reply: string, catalogUrl: string): string {
-  if (/https?:\/\//.test(reply)) {
+  const normalized = normalize(reply);
+  const alreadyPresentsCatalog =
+    /catalogo para que veas los departamentos y su disponibilidad/.test(
+      normalized,
+    );
+
+  if (alreadyPresentsCatalog) {
     return reply;
   }
 
-  return `${reply.trim()}\n\nPodés ver la web con los departamentos acá: ${catalogUrl} 😊`;
+  const withoutLinks = reply
+    .replace(/https?:\/\/\S+/g, " ")
+    .replace(/[ \t]{2,}/g, " ")
+    .trim();
+  const hasEmoji = /\p{Extended_Pictographic}/u.test(reply);
+
+  return `${withoutLinks}\n\nAcá te dejo el catálogo para que veas los departamentos y su disponibilidad: ${catalogUrl}${hasEmoji ? "" : " 😊"}`;
 }
 
 const NAME_REQUEST_SUFFIX =
