@@ -30,9 +30,13 @@ function extractCustomerName(
   message: string,
   history: ChatRequest["history"],
 ): string | null {
-  const last = history[history.length - 1];
-  const askedForName =
-    last?.role === "assistant" && /nombre/i.test(last.content);
+  const askedForName = history
+    .slice(-6)
+    .some(
+      (turn) =>
+        turn.role === "assistant" &&
+        /(nombre|llam[aá]s|llam[ae]|c[oó]mo te llamas)/i.test(turn.content),
+    );
 
   const text = message.trim();
   const explicit = text.match(
@@ -46,7 +50,7 @@ function extractCustomerName(
 
   candidate = candidate
     .replace(/[.,;!?].*$/s, "")
-    .replace(/^(soy|me llamo|mi nombre es)\s+/i, "")
+    .replace(/^(soy|me llamo|mi nombre es|es)\s+/i, "")
     .split(
       /\s+(?:y|e)\s+|\b(?:quiero|reserv\w*|departamento|depto|para|por|precio|disponib\w*)\b/i,
     )[0]
@@ -67,14 +71,18 @@ function extractCustomerName(
 
   const normalized = normalize(candidate);
   if (
-    /(hola|gracias|buenas|dale|ok|si|no|departamento|precio|reserv|quiero|cuanto|donde|que|chile|argentina|serena)/.test(
+    /(\bhola\b|\bgracias\b|\bbuenas\b|\bdale\b|\bok\b|\bsi\b|\bno\b|\bdepartamento\b|\bprecio\b|\breserv\w*\b|\bquiero\b|\bcuanto\b|\bdonde\b|\bque\b|\bchile\b|\bargentina\b|\bserena\b)/.test(
       normalized,
     )
   ) {
     return null;
   }
 
-  return candidate;
+  return candidate
+    .replace(/\p{L}[\p{L}'’-]*/gu, (word) => {
+      return word[0].toUpperCase() + word.slice(1).toLowerCase();
+    })
+    .trim();
 }
 
 function removePrematureHandoff(reply: string): string {
@@ -90,20 +98,8 @@ function removePrematureHandoff(reply: string): string {
     .trim();
 }
 
-function handoffReply(reply: string, name: string): string {
-  const clean = reply
-    .split(/(?<=[.!?])\s+/)
-    .filter(
-      (sentence) =>
-        !/(nombre|me lo indiques|confirm|equipo)/.test(normalize(sentence)),
-    )
-    .join(" ")
-    .trim();
-
-  const base = /[A-Za-zÁÉÍÓÚÑÜáéíóúñü]/.test(clean)
-    ? clean
-    : "¡Perfecto!";
-  return `${base}\n\nGracias, ${name}. Una persona del equipo va a continuar la conversación para coordinar la reserva.`;
+function handoffReply(_reply: string, name: string): string {
+  return `¡Perfecto, ${name}! Una persona del equipo va a continuar la conversación para coordinar la reserva.`;
 }
 
 /**
@@ -157,7 +153,21 @@ export class ChatService {
     const asksForName = /\b(nombre completo|nombre y apellido|tu nombre)\b/i.test(
       rawReply,
     );
-    const customerName = extractCustomerName(input.message, input.history);
+    const customerNameFromMessage = extractCustomerName(
+      input.message,
+      input.history,
+    );
+    let customerName = customerNameFromMessage;
+
+    if (!customerName) {
+      const fromReply = rawReply.match(
+        /(?:gracias|hola)[, ]+([A-ZÁÉÍÓÚÑÜ][a-záéíóúñü]+)/,
+      );
+      if (fromReply) {
+        customerName = fromReply[1];
+      }
+    }
+
     const wantsReservation =
       intent === "reservation" || asksForName || customerName !== null;
     const handoff = customerName !== null && wantsReservation;
