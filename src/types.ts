@@ -28,4 +28,6 @@ export interface ChatResponse {
   handoff: boolean;
   model: string;
   apartmentIds: string[];
+  customerName: string | null;
+  wantsReservation: boolean;
 }

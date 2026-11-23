@@ -5,6 +5,8 @@ const RESERVATION_PATTERNS = [
   /\bquiero (arrendar|alquilar|tomar)\b/,
   /\bquiero (el|ese|este) (departamento|depto|dpto)\b/,
   /\b(hacer|concretar) la reserva\b/,
+  /\binteres(ado|ada|a)\b/,
+  /\bme interesa\b/,
   /\bpagar\b/,
   /\btransferen/,
   /\bdni\b/,
