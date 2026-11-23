@@ -9,7 +9,7 @@ const priceFormat = new Intl.NumberFormat("es-CL", {
 function formatApartment(apartment: ApartmentContext): string {
   const price = priceFormat.format(apartment.pricePerNight);
   const features = apartment.features.join(", ") || "sin características cargadas";
-  return `- ${apartment.title}: ${price} por noche, hasta ${apartment.capacity} personas. ${apartment.description} Características: ${features}.`;
+  return `- ${apartment.title}: ${price} CLP por noche, hasta ${apartment.capacity} personas. ${apartment.description} Características: ${features}.`;
 }
 
 export function buildSystemPrompt(
