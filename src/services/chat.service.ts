@@ -8,11 +8,58 @@ import { buildSystemPrompt } from "./prompt.service";
 const HANDOFF_SUFFIX =
   "Para iniciar la reserva, enviá tu nombre completo. Una persona del equipo va a continuar la conversación.";
 
+const CATALOG_REQUEST =
+  /(departamento|depto|precio|valor|cuanto sale|reserv|disponib|catalogo|foto|alquil|arriend|enlace|link|whatsapp)/;
+
+const PITCH =
+  /(departamento|depto|catalogo|reserv|precio|whatsapp|enlace|carlo magno|te interesa|si queres ver|mira este)/;
+
+const CITY_FALLBACK =
+  "Contame qué querés saber de La Serena y te ayudo con gusto: playas, centro histórico, faro o paseos.";
+const GENERIC_FALLBACK = "Contame un poco más y te ayudo con gusto.";
+
 function ensureHandoff(reply: string): string {
   if (/nombre/i.test(reply)) {
     return reply;
   }
   return `${reply}\n\n${HANDOFF_SUFFIX}`;
+}
+
+function isCatalogRequest(message: string): boolean {
+  return CATALOG_REQUEST.test(normalize(message));
+}
+
+function isCityQuestion(message: string): boolean {
+  return !isCatalogRequest(message) && normalize(message).includes("la serena");
+}
+
+/**
+ * Para consultas que no son del catálogo, quita enlaces y frases que empujan
+ * a ver departamentos o reservar. Así una pregunta sobre la ciudad recibe una
+ * respuesta sobre la ciudad, sin publicidad.
+ */
+function stripPitch(reply: string): string {
+  const withoutLinks = reply.replace(/https?:\/\/\S+/g, " ");
+  const lines = withoutLinks.split(/\n+/);
+
+  const kept = lines
+    .map((line) => {
+      const sentences = line.split(/(?<=[.!?])\s+/);
+      return sentences
+        .filter(
+          (sentence) =>
+            !PITCH.test(normalize(sentence)) && !sentence.includes("$"),
+        )
+        .join(" ")
+        .trim();
+    })
+    .filter(Boolean);
+
+  return kept
+    .join("\n")
+    .replace(/[ \t]{2,}/g, " ")
+    .replace(/\s+([.,!?])/g, "$1")
+    .trim();
 }
 
 function mentionedApartmentIds(
@@ -38,7 +85,12 @@ export class ChatService {
       rawReply,
     );
     const handoff = intent === "reservation" || asksForName;
-    const reply = handoff ? ensureHandoff(rawReply) : rawReply;
+    const withHandoff = handoff ? ensureHandoff(rawReply) : rawReply;
+
+    const reply = isCatalogRequest(input.message)
+      ? withHandoff
+      : stripPitch(withHandoff) ||
+        (isCityQuestion(input.message) ? CITY_FALLBACK : GENERIC_FALLBACK);
 
     return {
       reply,
