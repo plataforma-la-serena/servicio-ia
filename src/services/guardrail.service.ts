@@ -7,8 +7,7 @@ const RESERVATION_PATTERNS = [
   /\b(hacer|concretar) la reserva\b/,
   /\b(interes(ado|ada|a)|me interesa)\b/,
   /\b(pagar|se[nñ]ar|abonar) (la|una|mi) (reserva|se[nñ]a|estad[ií]a)\b/,
-  /\bpagar (con|por) (transferencia|tarjeta|efectivo)\b/,
-  /\btransferen/,
+  /\btransferir (la|una) (se[nñ]a|reserva)\b/,
   /\bdni\b/,
   /\bdocumento\b/,
 ];

@@ -359,7 +359,7 @@ const ARCHETYPES = {
 const ARCHETYPE_KEYS = Object.keys(ARCHETYPES);
 
 const CITY_KEYWORDS =
-  /(playa|faro|centro|clima|santiago|aeropuerto|shopping|ni[nñ]o|familia|restaurante|coquimbo|elqui|isla damas|seguridad|evento|artesan|observatorio|transporte|estacion|cajero|banco|lluvia|museo|comida|noche|farmacia|hospital|feria|mercado|gratis|caf[eé]|turismo|visitar|pasear|ciudad)/;
+  /(playa|faro|centro|clima|santiago|aeropuerto|shopping|actividades|restaurante|coquimbo|elqui|isla damas|seguridad|evento|artesan|observatorio|transporte|estacion|cajero|banco|lluvia|museo|comida|noche|farmacia|hospital|feria|mercado|gratis|caf[eé]|turismo|visitar|pasear|ciudad)/;
 
 const APARTMENT_KEYWORDS =
   /(departamento|depto|precio|valor|cu[aá]nto sale|capacidad|personas|dormitorio|ba[nñ]o|cocina|balc[oó]n|estacionamiento|wifi|lavarropa|quincho|seguridad|mascota|pileta|aire|s[aá]bana|toalla|limpieza|dep[oó]sito|cancel|descuento|m[ií]nimo|check|fumar|ascensor|silla|vista|ropa de cama|secador|cochera|portero|reserv|quincho|juegos)/;
@@ -457,7 +457,9 @@ function toneMetrics(reply) {
   const slang = (
     norm.match(/\b(che|boludo|copado|zarpado|joya|de una|alta onda)\b/g) ?? []
   ).length;
-  const caps = (text.match(/\b[A-ZÁÉÍÓÚÑ]{3,}\b/g) ?? []).length;
+  const caps = (text.match(/\b[A-ZÁÉÍÓÚÑ]{4,}\b/g) ?? []).filter(
+    (word) => !/^(CLP|LSC|DNI|IVA)$/i.test(word),
+  ).length;
 
   let bucket = "neutral";
   if (emojis >= 3 || exclamations >= 3 || slang > 0 || caps >= 2) {
@@ -527,13 +529,18 @@ function evaluate(turn, data, previousWasNameRequest) {
     ) {
       flags.push("capacity_missing");
     }
+    const messageText = normalize(turn.message);
     const flat = (value) => normalize(value).replace(/[-\s]/g, "");
-    for (const feature of KNOWN_FEATURES) {
-      if (
-        flat(turn.message).includes(flat(feature)) &&
-        !flat(reply).includes(flat(feature))
-      ) {
-        flags.push(`feature_missing:${feature}`);
+    const usageQuestion =
+      /(usar|uso|siempre|reservar el|puedo usar|pol[ií]tica)/.test(messageText);
+    if (!usageQuestion) {
+      for (const feature of KNOWN_FEATURES) {
+        if (
+          flat(turn.message).includes(flat(feature)) &&
+          !flat(reply).includes(flat(feature))
+        ) {
+          flags.push(`feature_missing:${feature}`);
+        }
       }
     }
     if (
@@ -542,7 +549,6 @@ function evaluate(turn, data, previousWasNameRequest) {
     ) {
       flags.push("policy_answer_without_data");
     }
-    const messageText = normalize(turn.message);
     const isExistenceQuestion =
       /^(¿)?(tiene|hay|cuenta con)/.test(messageText) &&
       !/(siempre|uso|pol[ií]tica|costo|pagar|incluye|cubierta|cuando)/.test(
@@ -566,6 +572,10 @@ function evaluate(turn, data, previousWasNameRequest) {
     (type === "name" || previousWasNameRequest) &&
     !data.customerName &&
     turn.message.split(" ").length <= 4 &&
+    !turn.message.includes("?") &&
+    !/^(que|como|cuanto|cuanta|donde|hay|tiene|puedo|se puede|me recomend)/.test(
+      normalize(turn.message),
+    ) &&
     !["apartment", "city", "reservation"].includes(type)
   ) {
     flags.push("name_not_stored");

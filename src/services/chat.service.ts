@@ -35,7 +35,7 @@ function isCityQuestion(message: string): boolean {
 }
 
 const NAME_REQUEST_SUFFIX =
-  "Para iniciar la reserva, enviá tu nombre completo. Una persona del equipo va a continuar la conversación.";
+  "Para iniciar la reserva, enviame tu nombre completo 😊 Una persona del equipo va a continuar la conversación.";
 
 function extractCustomerName(
   message: string,
@@ -359,6 +359,23 @@ function priceReply(
 }
 
 /**
+ * Responde medios de pago sin inventar: el equipo los confirma por WhatsApp.
+ */
+function paymentReply(message: string): string | null {
+  const text = normalize(message);
+  const asksAboutPayment =
+    /(medios? de pago|formas? de pago|como se paga|aceptan (tarjeta|transferencia|efectivo)|pago con (tarjeta|transferencia|efectivo)|tarjeta o transferencia|se paga con)/.test(
+      text,
+    );
+
+  if (!asksAboutPayment) {
+    return null;
+  }
+
+  return "No tengo cargado el detalle de los medios de pago. El equipo te lo confirma por WhatsApp 😊";
+}
+
+/**
  * Responde ubicación usando la descripción cargada del departamento, sin que
  * el modelo invente distancias.
  */
@@ -428,11 +445,16 @@ export class ChatService {
     const priceAnswer = locationAnswer
       ? null
       : priceReply(input.message, input.apartments);
-    const featureAnswer =
+    const paymentAnswer =
       locationAnswer || priceAnswer
         ? null
+        : paymentReply(input.message);
+    const featureAnswer =
+      locationAnswer || priceAnswer || paymentAnswer
+        ? null
         : featureReply(input.message, input.apartments);
-    const directAnswer = locationAnswer ?? priceAnswer ?? featureAnswer;
+    const directAnswer =
+      locationAnswer ?? priceAnswer ?? paymentAnswer ?? featureAnswer;
     const rawReply = directAnswer ?? (await this.generate(input, intent));
     const asksForName = /\b(nombre completo|nombre y apellido|tu nombre)\b/i.test(
       rawReply,
