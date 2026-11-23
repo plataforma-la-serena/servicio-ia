@@ -34,6 +34,47 @@ function isCityQuestion(message: string): boolean {
   return CITY_TOPIC.test(text) && !isCatalogRequest(message);
 }
 
+const HUMAN_REQUEST = new RegExp(
+  [
+    "(hablar|comunicar(me)?|pas(ar|ame)|deriv\\w*|transferir(me)?)\\s+(con|a)\\s+(alguien|una persona|un humano|un asesor|un agente|una asesora|una agente|una persona real|el equipo)",
+    "(quiero|necesito|prefiero)\\s+(una persona|un humano|un asesor|un agente|hablar con alguien|atencion humana)",
+    "(me )?atienda\\s+(una|un)\\s+(persona|humano|asesor|agente)",
+    "(atencion|soporte|ayuda) humana",
+  ].join("|"),
+  "i",
+);
+
+const HUMAN_CONFIRMATION =
+  /(le avise a una persona|aviso a una persona|avisar a una persona|persona del equipo)/;
+
+const AFFIRMATIVE =
+  /^(si|dale|ok|okay|de una|por favor|confirmo|claro|listo|obvio|perfecto|hacelo|hacelo ya)\b/;
+
+const HUMAN_REQUEST_REPLY =
+  "Claro. ¿Querés que le avise a una persona del equipo para que te escriba por acá?";
+
+const HUMAN_CONFIRMED_REPLY =
+  "Listo, ya avisé a una persona del equipo. En breve te escriben por acá 😊";
+
+function isHumanRequest(message: string): boolean {
+  return HUMAN_REQUEST.test(normalize(message));
+}
+
+function isHumanConfirmation(
+  message: string,
+  history: ChatRequest["history"],
+): boolean {
+  const lastAssistant = [...history]
+    .reverse()
+    .find((turn) => turn.role === "assistant");
+
+  if (!lastAssistant || !HUMAN_CONFIRMATION.test(normalize(lastAssistant.content))) {
+    return false;
+  }
+
+  return AFFIRMATIVE.test(normalize(message).trim());
+}
+
 const CATALOG_PHRASE =
   "Acá te dejo el catálogo para que veas los departamentos y su disponibilidad";
 
@@ -499,6 +540,32 @@ export class ChatService {
   ) {}
 
   async reply(input: ChatRequest): Promise<ChatResponse> {
+    if (isHumanRequest(input.message)) {
+      return {
+        reply: HUMAN_REQUEST_REPLY,
+        intent: "question",
+        handoff: false,
+        model: this.llm?.model ?? "mock",
+        apartmentIds: [],
+        customerName: null,
+        wantsReservation: false,
+        wantsHuman: false,
+      };
+    }
+
+    if (isHumanConfirmation(input.message, input.history)) {
+      return {
+        reply: HUMAN_CONFIRMED_REPLY,
+        intent: "question",
+        handoff: false,
+        model: this.llm?.model ?? "mock",
+        apartmentIds: [],
+        customerName: null,
+        wantsReservation: false,
+        wantsHuman: true,
+      };
+    }
+
     const intent = detectIntent(input.message);
     const locationAnswer = locationReply(input.message, input.apartments);
     const priceAnswer = locationAnswer
@@ -581,6 +648,7 @@ export class ChatService {
       apartmentIds: mentionedApartmentIds(reply, input.apartments),
       customerName,
       wantsReservation,
+      wantsHuman: false,
     };
   }
 

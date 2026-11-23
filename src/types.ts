@@ -30,4 +30,5 @@ export interface ChatResponse {
   apartmentIds: string[];
   customerName: string | null;
   wantsReservation: boolean;
+  wantsHuman: boolean;
 }
