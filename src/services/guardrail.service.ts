@@ -23,7 +23,6 @@ const OFF_TOPIC_PATTERNS = [
   /\bfutbol\b/,
   /\bpolitica\b/,
   /\belecciones\b/,
-  /\bclima\b/,
   /\bchiste\b/,
   /\breceta\b/,
   /\bprograma(r|cion)\b/,
