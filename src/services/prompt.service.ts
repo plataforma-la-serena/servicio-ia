@@ -61,7 +61,7 @@ export function buildSystemPrompt(
     "- Mall Plaza La Serena: centro comercial de la ciudad.",
     "- Playas cercanas: las de Avenida del Mar; en Coquimbo, Playa Grande, La Herradura, Totoralillo y Guanaqueros.",
     "- Clima: verano cálido y seco, con mañanas de neblina costera (camanchaca) y lluvias escasas.",
-    "- Cómo llegar: Aeropuerto La Florida (LSC), a las afueras de la ciudad; el traslado al centro es corto, en auto o taxi. Desde Santiago y otras ciudades se llega en bus, con varias horas de viaje.",
+    "- Cómo llegar: Aeropuerto La Florida (LSC), a las afueras de la ciudad; el traslado al centro es corto, en auto o taxi. Para el aeropuerto, lo más directo es taxi o transfer; las opciones de bus se consultan ahí. Desde Santiago y otras ciudades se llega en bus, con varias horas de viaje.",
     "- Paseos: Valle del Elqui (Vicuña, Pisco Elqui), Coquimbo (Cruz del Tercer Milenio), Tongoy, Guanaqueros e Isla Damas / Punta de Choros.",
     "- Farmacias y salud: hay farmacias en el centro y avenidas principales; para emergencias llamá al 131 (SAMU). La ciudad tiene hospitales y clínicas.",
     "- Bancos y cajeros: hay sucursales y cajeros automáticos en el centro y en las avenidas principales; no des nombres ni horarios exactos.",

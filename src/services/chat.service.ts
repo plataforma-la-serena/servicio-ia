@@ -230,38 +230,74 @@ function featureReply(
 
   const apartment = apartments[0];
   const description = normalize(apartment.description);
+  const asked = FEATURE_QUESTIONS.filter(({ ask }) => ask.test(text));
 
-  for (const { ask, feature, label } of FEATURE_QUESTIONS) {
-    if (!ask.test(text)) {
-      continue;
-    }
-
-    const match = apartment.features.find((item) =>
-      feature.test(normalize(item)),
-    );
-    const inDescription = feature.test(description);
-    const asksAboutCost = /(pagar|costo|precio|incluye|gratis)/.test(text);
-
-    if (match || inDescription) {
-      const detail = match ?? label;
-
-      if (asksAboutCost) {
-        return `La ficha de *${apartment.title}* indica ${label}, pero no detalla si tiene costo. El equipo lo confirma por WhatsApp.`;
-      }
-
-      const asksForDetail = /(cubierta|techad|privad)/.test(text);
-      if (asksForDetail && !/(cubierta|techad|privad)/.test(normalize(detail))) {
-        return `La ficha de *${apartment.title}* indica ${label}, pero no detalla esa variante. El equipo lo confirma por WhatsApp.`;
-      }
-
-      return `Sí, *${apartment.title}* tiene ${featureName(detail)}.`;
-    }
-
-    return `La ficha de *${apartment.title}* no detalla ${label}. El equipo lo confirma por WhatsApp.`;
+  if (asked.length === 0) {
+    return policyFallback(message, apartment);
   }
 
-  const noun = text.match(
-    /^(?:\u00bf)?(?:tiene|hay|cuenta con|incluye)\s+(?:un|una|el|la|los|las|que)?\s*([a-zñ ]{3,40})/,
+  const asksAboutCost = /(pagar|costo|precio|incluye|gratis)/.test(text);
+  const asksForDetail = /(cubierta|techad|privad)/.test(text);
+
+  // Si preguntan por varias características, responder todas.
+  if (asked.length > 1 && !asksAboutCost && !asksForDetail) {
+    const present: string[] = [];
+    const missing: string[] = [];
+
+    for (const { feature, label } of asked) {
+      const match = apartment.features.find((item) =>
+        feature.test(normalize(item)),
+      );
+      if (match || feature.test(description)) {
+        present.push(featureName(match ?? label));
+      } else {
+        missing.push(label);
+      }
+    }
+
+    const parts: string[] = [];
+    if (present.length > 0) {
+      parts.push(`Sí, *${apartment.title}* tiene ${joinEs(present)}.`);
+    }
+    if (missing.length > 0) {
+      parts.push(
+        `La ficha no detalla ${joinEs(missing)}. El equipo lo confirma por WhatsApp 😊`,
+      );
+    }
+    return parts.join(" ");
+  }
+
+  const { feature, label } = asked[0];
+  const match = apartment.features.find((item) =>
+    feature.test(normalize(item)),
+  );
+  const inDescription = feature.test(description);
+
+  if (match || inDescription) {
+    const detail = match ?? label;
+
+    if (asksAboutCost) {
+      return `La ficha de *${apartment.title}* indica ${label}, pero no detalla si tiene costo. El equipo lo confirma por WhatsApp 😊`;
+    }
+
+    if (asksForDetail && !/(cubierta|techad|privad)/.test(normalize(detail))) {
+      return `La ficha de *${apartment.title}* indica ${label}, pero no detalla esa variante. El equipo lo confirma por WhatsApp 😊`;
+    }
+
+    return `Sí, *${apartment.title}* tiene ${featureName(detail)}.`;
+  }
+
+  return `La ficha de *${apartment.title}* no detalla ${label}. El equipo lo confirma por WhatsApp 😊`;
+
+  return null;
+}
+
+function policyFallback(
+  message: string,
+  apartment: ChatRequest["apartments"][number],
+): string | null {
+  const noun = message.trim().match(
+    /^(?:\u00bf)?(?:tiene|hay|cuenta con|incluye)\s+(?:un|una|el|la|los|las|que)?\s*([a-záéíóúñü ]{3,40})/i,
   );
 
   if (!noun) {
@@ -270,14 +306,56 @@ function featureReply(
 
   const term = noun[1].replace(/\s+/g, " ").trim();
   if (
-    /(tour|playa|centro|ciudad|restaurant|restaurante|cafe|faro|museo|mercado|feria|transporte|bus|taxi|aeropuerto|paseo|valle|coquimbo|elqui|artesani|shopping|mall|comercial|banco|cajero|farmacia|hospital|salud|clinica|super|clima|evento|observatorio|isla|punta|terminal|universidad|colegio)/.test(
-      term,
+    /(algo|opcion|opciones|disponib|lugar|habitacion|economico|barato|otra cosa|tour|playa|centro|ciudad|restaurant|restaurante|cafe|faro|museo|mercado|feria|transporte|bus|taxi|aeropuerto|paseo|valle|coquimbo|elqui|artesani|shopping|mall|comercial|banco|cajero|farmacia|hospital|salud|clinica|super|clima|evento|observatorio|isla|punta|terminal|universidad|colegio)/.test(
+      normalize(term),
     )
   ) {
     return null;
   }
 
-  return `La ficha de *${apartment.title}* no detalla ${term}. El equipo lo confirma por WhatsApp.`;
+  return `La ficha de *${apartment.title}* no detalla ${term}. El equipo lo confirma por WhatsApp 😊`;
+}
+
+function joinEs(items: string[]): string {
+  if (items.length <= 1) {
+    return items[0] ?? "";
+  }
+  const last = items[items.length - 1];
+  const separator = /^[ei]/i.test(last) ? "e" : "y";
+  return `${items.slice(0, -1).join(", ")} ${separator} ${last}`;
+}
+
+const PRICE_FORMAT = new Intl.NumberFormat("es-CL", {
+  style: "currency",
+  currency: "CLP",
+  maximumFractionDigits: 0,
+});
+
+/**
+ * Responde búsquedas de algo más económico con las opciones reales cargadas.
+ */
+function priceReply(
+  message: string,
+  apartments: ChatRequest["apartments"],
+): string | null {
+  if (apartments.length !== 1) {
+    return null;
+  }
+
+  const text = normalize(message);
+  const asksCheaper =
+    /(mas economico|mas barato|algo barato|algo economico|otra opcion|opciones mas|algo mas barato|presupuesto)/.test(
+      text,
+    );
+
+  if (!asksCheaper) {
+    return null;
+  }
+
+  const apartment = apartments[0];
+  const price = PRICE_FORMAT.format(apartment.pricePerNight);
+
+  return `Por ahora el único departamento disponible es *${apartment.title}*, a *${price} CLP por noche*. No tengo cargada otra opción más económica 😊`;
 }
 
 /**
@@ -347,10 +425,14 @@ export class ChatService {
   async reply(input: ChatRequest): Promise<ChatResponse> {
     const intent = detectIntent(input.message);
     const locationAnswer = locationReply(input.message, input.apartments);
-    const featureAnswer = locationAnswer
+    const priceAnswer = locationAnswer
       ? null
-      : featureReply(input.message, input.apartments);
-    const directAnswer = locationAnswer ?? featureAnswer;
+      : priceReply(input.message, input.apartments);
+    const featureAnswer =
+      locationAnswer || priceAnswer
+        ? null
+        : featureReply(input.message, input.apartments);
+    const directAnswer = locationAnswer ?? priceAnswer ?? featureAnswer;
     const rawReply = directAnswer ?? (await this.generate(input, intent));
     const asksForName = /\b(nombre completo|nombre y apellido|tu nombre)\b/i.test(
       rawReply,
