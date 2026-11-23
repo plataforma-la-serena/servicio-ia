@@ -34,24 +34,63 @@ function isCityQuestion(message: string): boolean {
   return CITY_TOPIC.test(text) && !isCatalogRequest(message);
 }
 
-function withCatalogLink(reply: string, catalogUrl: string): string {
-  const normalized = normalize(reply);
-  const alreadyPresentsCatalog =
-    /catalogo para que veas los departamentos y su disponibilidad/.test(
-      normalized,
-    );
+const CATALOG_PHRASE =
+  "Acá te dejo el catálogo para que veas los departamentos y su disponibilidad";
+
+function catalogLine(originalReply: string, catalogUrl: string): string {
+  const hasEmoji = /\p{Extended_Pictographic}/u.test(originalReply);
+  return `${CATALOG_PHRASE}: ${catalogUrl}${hasEmoji ? "" : " 😊"}`;
+}
+
+/**
+ * Deja el enlace del catálogo siempre presentado con la misma frase.
+ * - Si la respuesta ya lo presenta, no la toca.
+ * - Si trae el link suelto, lo reemplaza por la presentación completa.
+ * - Si `addIfMissing`, agrega la presentación cuando no hay ningún enlace.
+ */
+function withCatalogLink(
+  reply: string,
+  catalogUrl: string,
+  addIfMissing: boolean,
+): string {
+  const trimmed = reply.trim();
+  const alreadyPresentsCatalog = normalize(trimmed).includes(
+    normalize(CATALOG_PHRASE),
+  );
 
   if (alreadyPresentsCatalog) {
-    return reply;
+    return trimmed;
   }
 
-  const withoutLinks = reply
-    .replace(/https?:\/\/\S+/g, " ")
-    .replace(/[ \t]{2,}/g, " ")
-    .trim();
-  const hasEmoji = /\p{Extended_Pictographic}/u.test(reply);
+  const hasUrl = /https?:\/\//.test(trimmed);
 
-  return `${withoutLinks}\n\nAcá te dejo el catálogo para que veas los departamentos y su disponibilidad: ${catalogUrl}${hasEmoji ? "" : " 😊"}`;
+  if (!hasUrl) {
+    return addIfMissing
+      ? `${trimmed}\n\n${catalogLine(trimmed, catalogUrl)}`
+      : trimmed;
+  }
+
+  const kept = trimmed
+    .split(/\n+/)
+    .filter((line) => {
+      if (!/https?:\/\//.test(line)) {
+        return true;
+      }
+      const withoutUrl = normalize(line.replace(/https?:\/\/\S+/g, ""));
+      const isCatalogCallToAction =
+        /(ver|mirar|revisar|visitar|conocer|entrar|detalles|opciones|informacion|catalogo|web|pagina|enlace|link|aca|aqui)/.test(
+          withoutUrl,
+        );
+      return !isCatalogCallToAction;
+    })
+    .map((line) => line.replace(/https?:\/\/\S+/g, "").trim())
+    .filter(Boolean);
+
+  const base = kept.join("\n\n").replace(/\n{3,}/g, "\n\n").trim();
+
+  return base
+    ? `${base}\n\n${catalogLine(trimmed, catalogUrl)}`
+    : catalogLine(trimmed, catalogUrl);
 }
 
 const NAME_REQUEST_SUFFIX =
@@ -526,10 +565,13 @@ export class ChatService {
       reply = isCityQuestion(input.message) ? CITY_FALLBACK : GENERIC_FALLBACK;
     }
 
-    // En el primer saludo de la conversación, adjuntar siempre el enlace del sitio.
-    if (intent === "greeting" && input.history.length === 0) {
-      reply = withCatalogLink(reply, this.config.catalogUrl);
-    }
+    // Un saludo siempre presenta el catálogo; en el resto de las respuestas
+    // con enlace, se normaliza la presentación para no dejar el link suelto.
+    reply = withCatalogLink(
+      reply,
+      this.config.catalogUrl,
+      intent === "greeting",
+    );
 
     return {
       reply,
