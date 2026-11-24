@@ -133,6 +133,48 @@ function withCatalogLink(
     : catalogLine(trimmed, catalogUrl);
 }
 
+const GREETING_PREFIX =
+  /^(?:¡)?(?:hola|holis|holi|buenas(?:\s+(?:tardes|noches|d[ií]as))?|buen d[ií]a|buenos d[ií]as|qu[eé] tal|hey)\b(?:\s+(?:de nuevo|nuevamente))?/i;
+
+/**
+ * Quita el saludo inicial cuando la conversación ya venía hablando. El bot no
+ * debe volver a saludar en cada respuesta.
+ */
+function stripLeadingGreeting(reply: string): string {
+  const lines = reply.split("\n");
+  const firstIndex = lines.findIndex((line) => line.trim().length > 0);
+
+  if (firstIndex < 0) {
+    return reply;
+  }
+
+  const line = lines[firstIndex];
+  const sentences = line.split(/(?<=[.!?])\s+/);
+  const first = sentences[0] ?? "";
+  const normalizedFirst = normalize(first)
+    .replace(/[^\p{L}\s]/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  const greetingOnly =
+    /^(hola|holis|holi|buenas|buenas tardes|buenas noches|buen dia|buenos dias|que tal|hey)( de nuevo| nuevamente)?( que gusto saludarte| como estas| como andas| todo bien| bienvenido| bienvenida)?$/.test(
+      normalizedFirst,
+    );
+
+  if (greetingOnly) {
+    sentences.shift();
+  } else {
+    sentences[0] = first.replace(GREETING_PREFIX, "").trim();
+  }
+
+  lines[firstIndex] = sentences
+    .filter((sentence) => sentence.trim().length > 0)
+    .join(" ")
+    .trim();
+
+  return lines.join("\n").replace(/\n{3,}/g, "\n\n").trim();
+}
+
 function normalizePrices(reply: string): string {
   return reply
     .replace(/(?<!\$)(\b\d{1,3}(?:\.\d{3})+)\s*CLP\b/g, "$$$1 CLP")
@@ -637,13 +679,25 @@ export class ChatService {
       reply = isCityQuestion(input.message) ? CITY_FALLBACK : GENERIC_FALLBACK;
     }
 
-    // Un saludo siempre presenta el catálogo; en el resto de las respuestas
+    // Solo el saludo inicial agrega el catálogo. En el resto de las respuestas
     // con enlace, se normaliza la presentación para no dejar el link suelto.
     reply = withCatalogLink(
       reply,
       this.config.catalogUrl,
-      intent === "greeting",
+      intent === "greeting" && input.history.length === 0,
     );
+
+    if (input.history.length > 0) {
+      reply = stripLeadingGreeting(reply) || GENERIC_FALLBACK;
+
+      const [firstLine, ...rest] = reply.split("\n");
+      if (rest.length > 0 && !/[A-Za-zÁÉÍÓÚÑÜáéíóúñü]{3,}/.test(firstLine)) {
+        reply = ["¿En qué te puedo ayudar?", ...rest].join("\n").trim();
+      } else if (!/[A-Za-zÁÉÍÓÚÑÜáéíóúñü]{3,}/.test(reply)) {
+        reply = "¿En qué te puedo ayudar?";
+      }
+    }
+
     reply = normalizePrices(reply);
 
     return {
