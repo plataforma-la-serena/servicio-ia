@@ -89,6 +89,22 @@ function catalogLine(originalReply: string, catalogUrl: string): string {
  * - Si trae el link suelto, lo reemplaza por la presentación completa.
  * - Si `addIfMissing`, agrega la presentación cuando no hay ningún enlace.
  */
+function removeCatalogMentions(text: string): string {
+  return text
+    .split(/\n+/)
+    .map((line) =>
+      line
+        .split(/(?<=[.!?])\s+/)
+        .filter((sentence) => !/catalogo/.test(normalize(sentence)))
+        .join(" ")
+        .trim(),
+    )
+    .filter(Boolean)
+    .join("\n\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 function withCatalogLink(
   reply: string,
   catalogUrl: string,
@@ -104,14 +120,24 @@ function withCatalogLink(
   }
 
   const hasUrl = /https?:\/\//.test(trimmed);
+  const mentionsCatalog = /catalogo/.test(normalize(trimmed));
 
   if (!hasUrl) {
-    return addIfMissing
-      ? `${trimmed}\n\n${catalogLine(trimmed, catalogUrl)}`
-      : trimmed;
+    if (!addIfMissing && !mentionsCatalog) {
+      return trimmed;
+    }
+
+    const base = mentionsCatalog ? removeCatalogMentions(trimmed) : trimmed;
+    return base
+      ? `${base}\n\n${catalogLine(trimmed, catalogUrl)}`
+      : catalogLine(trimmed, catalogUrl);
   }
 
-  const kept = trimmed
+  const withoutCatalog = mentionsCatalog
+    ? removeCatalogMentions(trimmed)
+    : trimmed;
+
+  const kept = withoutCatalog
     .split(/\n+/)
     .filter((line) => {
       if (!/https?:\/\//.test(line)) {
@@ -119,7 +145,7 @@ function withCatalogLink(
       }
       const withoutUrl = normalize(line.replace(/https?:\/\/\S+/g, ""));
       const isCatalogCallToAction =
-        /(ver|mirar|revisar|visitar|conocer|entrar|detalles|opciones|informacion|catalogo|web|pagina|enlace|link|aca|aqui)/.test(
+        /(ver|mirar|revisar|visitar|conocer|entrar|detalles|opciones|informacion|web|pagina|enlace|link|aca|aqui)/.test(
           withoutUrl,
         );
       return !isCatalogCallToAction;
@@ -132,6 +158,12 @@ function withCatalogLink(
   return base
     ? `${base}\n\n${catalogLine(trimmed, catalogUrl)}`
     : catalogLine(trimmed, catalogUrl);
+}
+
+function normalizePrices(reply: string): string {
+  return reply
+    .replace(/(?<!\$)(\b\d{1,3}(?:\.\d{3})+)\s*CLP\b/g, "$$$1 CLP")
+    .replace(/\bCLP\s*(\d{1,3}(?:\.\d{3})+)/g, "CLP $$$1");
 }
 
 const NAME_REQUEST_SUFFIX =
@@ -639,6 +671,7 @@ export class ChatService {
       this.config.catalogUrl,
       intent === "greeting",
     );
+    reply = normalizePrices(reply);
 
     return {
       reply,
