@@ -111,49 +111,22 @@ function withCatalogLink(
   addIfMissing: boolean,
 ): string {
   const trimmed = reply.trim();
-  const alreadyPresentsCatalog = normalize(trimmed).includes(
-    normalize(CATALOG_PHRASE),
-  );
-
-  if (alreadyPresentsCatalog) {
-    return trimmed;
-  }
-
   const hasUrl = /https?:\/\//.test(trimmed);
   const mentionsCatalog = /catalogo/.test(normalize(trimmed));
 
-  if (!hasUrl) {
-    if (!addIfMissing && !mentionsCatalog) {
-      return trimmed;
-    }
-
-    const base = mentionsCatalog ? removeCatalogMentions(trimmed) : trimmed;
-    return base
-      ? `${base}\n\n${catalogLine(trimmed, catalogUrl)}`
-      : catalogLine(trimmed, catalogUrl);
+  if (!hasUrl && !mentionsCatalog && !addIfMissing) {
+    return trimmed;
   }
 
-  const withoutCatalog = mentionsCatalog
-    ? removeCatalogMentions(trimmed)
-    : trimmed;
-
-  const kept = withoutCatalog
+  // Se quita cualquier presentación previa del catálogo y se deja una sola.
+  const withoutCatalog = removeCatalogMentions(trimmed);
+  const base = withoutCatalog
     .split(/\n+/)
-    .filter((line) => {
-      if (!/https?:\/\//.test(line)) {
-        return true;
-      }
-      const withoutUrl = normalize(line.replace(/https?:\/\/\S+/g, ""));
-      const isCatalogCallToAction =
-        /(ver|mirar|revisar|visitar|conocer|entrar|detalles|opciones|informacion|web|pagina|enlace|link|aca|aqui)/.test(
-          withoutUrl,
-        );
-      return !isCatalogCallToAction;
-    })
     .map((line) => line.replace(/https?:\/\/\S+/g, "").trim())
-    .filter(Boolean);
-
-  const base = kept.join("\n\n").replace(/\n{3,}/g, "\n\n").trim();
+    .filter(Boolean)
+    .join("\n\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 
   return base
     ? `${base}\n\n${catalogLine(trimmed, catalogUrl)}`

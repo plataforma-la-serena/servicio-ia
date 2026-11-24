@@ -496,6 +496,15 @@ function evaluate(turn, data, previousWasNameRequest) {
     flags.push("mock_fallback");
   }
 
+  const catalogMentions = (reply.match(/cat[aá]logo/gi) ?? []).length;
+  const links = (reply.match(/https?:\/\//g) ?? []).length;
+  if (catalogMentions > 1) {
+    flags.push("duplicate_catalog");
+  }
+  if (links > 1) {
+    flags.push("duplicate_link");
+  }
+
   const isGreeting =
     /^(hola|holis|holi|buenas|buen dia|buenos dias|buenas tardes|buenas noches|que tal|hey)\b/.test(
       normalize(turn.message),
