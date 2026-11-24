@@ -11,7 +11,7 @@ const OFF_TOPIC_REPLY =
   "Me encantaría ayudarte con eso, pero solo puedo responder sobre los departamentos y sobre La Serena. ¿Querés que te cuente qué hay disponible?";
 
 function greeting(catalogUrl: string): string {
-  return `¡Hola! Soy el asistente de La Serena 😊 Podés ver el catálogo completo acá: ${catalogUrl}. ¿Te ayudo a encontrar tu departamento ideal?`;
+  return `¡Hola! Soy el asistente de Alquileres 4 Esquinas 😊 Podés ver el catálogo completo acá: ${catalogUrl}. ¿Te ayudo a encontrar tu departamento ideal?`;
 }
 
 function reservation(): string {
