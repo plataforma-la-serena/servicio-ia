@@ -25,6 +25,7 @@ const chatSchema = z.object({
     .max(20)
     .default([]),
   apartments: z.array(apartmentSchema).max(50).default([]),
+  source: z.enum(["text", "audio"]).optional().default("text"),
 });
 
 export interface ChatRouteDeps {

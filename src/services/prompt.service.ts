@@ -68,6 +68,7 @@ export function buildSystemPrompt(
     "- Farmacias y salud: hay farmacias en el centro y avenidas principales; para emergencias llamá al 131 (SAMU). La ciudad tiene hospitales y clínicas.",
     "- Bancos y cajeros: hay sucursales y cajeros automáticos en el centro y en las avenidas principales; no des nombres ni horarios exactos.",
     "- Estacionamiento en el centro: hay estacionamientos pagos y zonas de estacionamiento medido; no des nombres ni tarifas.",
+    "- Supermercados: hay supermercados y minimarkets en la zona; no des nombres ni direcciones exactas.",
     "- Restaurantes: no des nombres; sugerí el centro histórico, el mercado La Recova y Avenida del Mar.",
     "- Eventos: en enero es temporada alta; decí que la agenda cultural la publica la Municipalidad de La Serena y no inventes actividades ni fechas.",
     "- Artesanías y mercados: ferias y mercados del centro histórico.",

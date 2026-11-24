@@ -19,7 +19,7 @@ const CITY_FALLBACK =
 const GENERIC_FALLBACK = "Contame un poco más y te ayudo con gusto.";
 
 const CITY_TOPIC =
-  /(cafe|restaurant|centro historico|centro de la ciudad|ciudad|playa|museo|\bmercado|feria|faro|transporte|micro|colectivo|tour|paseo|valle|coquimbo|elqui|isla damas|observatorio|artesani)/;
+  /(cafe|restaurant|centro historico|centro de la ciudad|ciudad|playa|museo|supermercado|\bmercado|feria|faro|transporte|micro|colectivo|tour|paseo|valle|coquimbo|elqui|isla damas|observatorio|artesani)/;
 
 function isCatalogRequest(message: string): boolean {
   return CATALOG_REQUEST.test(normalize(message));
@@ -89,13 +89,41 @@ function catalogLine(originalReply: string, catalogUrl: string): string {
  * - Si trae el link suelto, lo reemplaza por la presentación completa.
  * - Si `addIfMissing`, agrega la presentación cuando no hay ningún enlace.
  */
+const CATALOG_CTA =
+  /(pod[eé]s|puedes|mir[aá]|revis[aá]|visit[aá]|conoc[eé]|entr[aá]|te dejo|te comparto|encontr[aá]s)\s+(ver\s+|mirar\s+|revisar\s+|visitar\s+|conocer\s+|entrar\s+)?(todos\s+)?(los\s+)?(detalles|departamentos|apartamentos|opciones|precios|fotos|informaci[oó]n|catalogo|web|p[aá]gina|enlace|link)/;
+
+function isCatalogCta(sentence: string): boolean {
+  const norm = normalize(sentence);
+
+  if (/catalogo/.test(norm)) {
+    return true;
+  }
+
+  if (CATALOG_CTA.test(norm)) {
+    return true;
+  }
+
+  const words = norm.split(/\s+/).filter(Boolean);
+
+  if (
+    words.length <= 12 &&
+    /(detalles|opciones|informacion|fotos|precios|departamentos|apartamentos)\s+(en|aca|aqui)?\s*[:.]?$/.test(
+      norm,
+    )
+  ) {
+    return true;
+  }
+
+  return words.length <= 8 && /(^|\s)(en|aca|aqui)\s*[:.]?$/.test(norm);
+}
+
 function removeCatalogMentions(text: string): string {
   return text
     .split(/\n+/)
     .map((line) =>
       line
         .split(/(?<=[.!?])\s+/)
-        .filter((sentence) => !/catalogo/.test(normalize(sentence)))
+        .filter((sentence) => !isCatalogCta(sentence))
         .join(" ")
         .trim(),
     )
@@ -116,6 +144,23 @@ function withCatalogLink(
 
   if (!hasUrl && !mentionsCatalog && !addIfMissing) {
     return trimmed;
+  }
+
+  if (mentionsCatalog) {
+    const withoutStandard = trimmed.split(CATALOG_PHRASE).join(" ");
+    const remainingHasCatalog = /catalogo/.test(normalize(withoutStandard));
+    const remainingHasCta = withoutStandard
+      .split(/\n+/)
+      .some((line) =>
+        line
+          .split(/(?<=[.!?])\s+/)
+          .some((sentence) => sentence.trim().length > 0 && isCatalogCta(sentence)),
+      );
+
+    // Solo está la presentación estándar: no hace falta reescribir nada.
+    if (!remainingHasCatalog && !remainingHasCta) {
+      return trimmed;
+    }
   }
 
   // Se quita cualquier presentación previa del catálogo y se deja una sola.
@@ -233,6 +278,63 @@ function extractCustomerName(
       normalized,
     )
   ) {
+    return null;
+  }
+
+  return candidate
+    .replace(/\p{L}[\p{L}'’-]*/gu, (word) => {
+      return word[0].toUpperCase() + word.slice(1).toLowerCase();
+    })
+    .trim();
+}
+
+function extractPendingName(
+  history: ChatRequest["history"],
+): string | null {
+  const lastAssistant = [...history]
+    .reverse()
+    .find((turn) => turn.role === "assistant");
+  const match = lastAssistant?.content.match(/Escuché «([^»]+)»/);
+  return match?.[1]?.trim() || null;
+}
+
+function extractCorrectionName(message: string): string | null {
+  const text = message.trim();
+  let candidate: string | null = null;
+
+  const explicit = text.match(
+    /(?:no,?\s*)?(?:es|soy|me llamo|mi nombre es)\s+([A-Za-zÁÉÍÓÚÑÜáéíóúñü' -]{2,60})/i,
+  );
+
+  if (explicit) {
+    candidate = explicit[1];
+  } else {
+    const rest = text.replace(/^no[,.;\s]+/i, "").trim();
+    if (
+      rest &&
+      rest.split(/\s+/).length <= 4 &&
+      /^[A-Za-zÁÉÍÓÚÑÜáéíóúñü' -]+$/.test(rest)
+    ) {
+      candidate = rest;
+    }
+  }
+
+  if (!candidate) {
+    return null;
+  }
+
+  candidate = candidate
+    .replace(/[.,;!?].*$/s, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (candidate.length < 2 || candidate.length > 60) {
+    return null;
+  }
+  if (!/^[A-Za-zÁÉÍÓÚÑÜáéíóúñü' -]+$/.test(candidate)) {
+    return null;
+  }
+  if (candidate.split(" ").length > 4) {
     return null;
   }
 
@@ -472,6 +574,92 @@ function joinEs(items: string[]): string {
   return `${items.slice(0, -1).join(", ")} ${separator} ${last}`;
 }
 
+const POLICY_REPLIES: Array<{ ask: RegExp; reply: string }> = [
+  {
+    ask: /(deposito|sena|garantia)/,
+    reply:
+      "No tengo el detalle del depósito o la seña. El equipo lo confirma por WhatsApp 😊",
+  },
+  {
+    ask: /(cancelacion|cancelar)/,
+    reply:
+      "No tengo el detalle de las políticas de cancelación. El equipo lo confirma por WhatsApp 😊",
+  },
+  {
+    ask: /(mascota)/,
+    reply:
+      "No tengo cargado si aceptan mascotas. El equipo lo confirma por WhatsApp 😊",
+  },
+  {
+    ask: /(sabana|toalla|ropa de cama)/,
+    reply:
+      "No tengo el detalle de sábanas y toallas. El equipo lo confirma por WhatsApp 😊",
+  },
+  {
+    ask: /(limpieza)/,
+    reply:
+      "No tengo el detalle de limpieza. El equipo lo confirma por WhatsApp 😊",
+  },
+  {
+    ask: /(check.?in|check.?out|horario de ingreso|horario de salida)/,
+    reply:
+      "No tengo el horario exacto de check-in y check-out. El equipo lo confirma por WhatsApp 😊",
+  },
+  {
+    ask: /(descuento|minimo de noches)/,
+    reply:
+      "No tengo el detalle de descuentos o mínimo de noches. El equipo lo confirma por WhatsApp 😊",
+  },
+  {
+    ask: /(fumar)/,
+    reply:
+      "No tengo el detalle sobre fumar en el departamento. El equipo lo confirma por WhatsApp 😊",
+  },
+  {
+    ask: /(ascensor|silla de ruedas|accesib)/,
+    reply:
+      "No tengo el detalle de accesibilidad o ascensor. El equipo lo confirma por WhatsApp 😊",
+  },
+  {
+    ask: /(secador|portero|cochera|vista al mar)/,
+    reply: "No tengo ese detalle. El equipo lo confirma por WhatsApp 😊",
+  },
+];
+
+function policyReply(message: string): string | null {
+  const text = normalize(message);
+  return POLICY_REPLIES.find(({ ask }) => ask.test(text))?.reply ?? null;
+}
+
+const CATALOG_LIST_REQUEST =
+  /((que|cu[aá]les|cuantos|cuantas)\s+(apartamentos|departamentos|deptos|dptos|opciones)\s+(tienen|hay|estan|quedan|disponibles))|((apartamentos|departamentos|deptos|dptos)\s+disponibles)|(que\s+(tienen|ofrecen|hay)\s+disponible)|(mostrame\s+(los|el)\s+(apartamentos|departamentos|deptos))/;
+
+function catalogListReply(
+  message: string,
+  apartments: ChatRequest["apartments"],
+  catalogUrl: string,
+): string | null {
+  if (!CATALOG_LIST_REQUEST.test(normalize(message))) {
+    return null;
+  }
+
+  if (apartments.length === 0) {
+    return "No hay departamentos disponibles en este momento.";
+  }
+
+  const intro =
+    apartments.length === 1
+      ? "Tenemos este departamento disponible:"
+      : "Tenemos estos departamentos disponibles:";
+
+  const lines = apartments.map(
+    (apartment) =>
+      `- *${apartment.title}*: ${PRICE_FORMAT.format(apartment.pricePerNight)} CLP por noche, hasta ${apartment.capacity} personas.`,
+  );
+
+  return `${intro}\n\n${lines.join("\n")}\n\n${CATALOG_PHRASE}: ${catalogUrl} 😊`;
+}
+
 const PRICE_FORMAT = new Intl.NumberFormat("es-CL", {
   style: "currency",
   currency: "CLP",
@@ -481,6 +669,20 @@ const PRICE_FORMAT = new Intl.NumberFormat("es-CL", {
 /**
  * Responde búsquedas de algo más económico con las opciones reales cargadas.
  */
+function supermarketReply(message: string): string | null {
+  const text = normalize(message);
+
+  if (!/(supermercado|minimarket|almacen)/.test(text)) {
+    return null;
+  }
+
+  if (!/(cerca|hay|queda)/.test(text)) {
+    return null;
+  }
+
+  return "En la zona hay supermercados y minimarkets. El equipo te confirma cuál te queda más cerca 😊";
+}
+
 function priceReply(
   message: string,
   apartments: ChatRequest["apartments"],
@@ -535,15 +737,14 @@ function locationReply(
   }
 
   const text = normalize(message);
-  const asksLocation =
-    /(cerca|distancia|queda|ubicad|donde esta|donde queda|lejos)/.test(text);
+  const asksLocation = /(cerca|distancia|queda|ubicad|lejos)/.test(text);
 
   if (!asksLocation) {
     return null;
   }
 
   const topics: Array<{ ask: RegExp; match: RegExp }> = [
-    { ask: /(playa|mar|faro)/, match: /(playa|mar|cuadra|faro)/ },
+    { ask: /(playa|mar)/, match: /(playa|mar|cuadra)/ },
     { ask: /(centro)/, match: /(centro)/ },
     { ask: /(super|minimarket|almacen)/, match: /(minimarket|super|almacen)/ },
     { ask: /(comer|restaurant|panader)/, match: /(comer|restaurant|panader)/ },
@@ -613,21 +814,92 @@ export class ChatService {
       };
     }
 
+    const pendingName = extractPendingName(input.history);
+
+    if (pendingName) {
+      const answer = normalize(input.message).trim();
+      const affirmative =
+        /^(si|dale|correcto|esta bien|asi esta bien|confirmo|ok|claro)\b/.test(
+          answer,
+        );
+      const corrected = affirmative
+        ? null
+        : extractCorrectionName(input.message);
+      const finalName = corrected ?? (affirmative ? pendingName : null);
+
+      if (finalName) {
+        return {
+          reply: handoffReply("", finalName),
+          intent: "question",
+          handoff: true,
+          model: this.llm?.model ?? "mock",
+          apartmentIds: [],
+          customerName: finalName,
+          wantsReservation: true,
+          wantsHuman: false,
+        };
+      }
+
+      if (/^no\b/.test(answer)) {
+        return {
+          reply: "Escribime tu nombre completo, por favor.",
+          intent: "question",
+          handoff: false,
+          model: this.llm?.model ?? "mock",
+          apartmentIds: [],
+          customerName: pendingName,
+          wantsReservation: true,
+          wantsHuman: false,
+        };
+      }
+    }
+
     const intent = detectIntent(input.message);
-    const locationAnswer = locationReply(input.message, input.apartments);
-    const priceAnswer = locationAnswer
+    const catalogAnswer = catalogListReply(
+      input.message,
+      input.apartments,
+      this.config.catalogUrl,
+    );
+    const locationAnswer = catalogAnswer
       ? null
-      : priceReply(input.message, input.apartments);
+      : locationReply(input.message, input.apartments);
+    const supermarketAnswer =
+      catalogAnswer || locationAnswer
+        ? null
+        : supermarketReply(input.message);
+    const priceAnswer =
+      catalogAnswer || locationAnswer || supermarketAnswer
+        ? null
+        : priceReply(input.message, input.apartments);
     const paymentAnswer =
-      locationAnswer || priceAnswer
+      catalogAnswer || locationAnswer || supermarketAnswer || priceAnswer
         ? null
         : paymentReply(input.message);
+    const policyAnswer =
+      catalogAnswer ||
+      locationAnswer ||
+      supermarketAnswer ||
+      priceAnswer ||
+      paymentAnswer
+        ? null
+        : policyReply(input.message);
     const featureAnswer =
-      locationAnswer || priceAnswer || paymentAnswer
+      catalogAnswer ||
+      locationAnswer ||
+      supermarketAnswer ||
+      priceAnswer ||
+      paymentAnswer ||
+      policyAnswer
         ? null
         : featureReply(input.message, input.apartments);
     const directAnswer =
-      locationAnswer ?? priceAnswer ?? paymentAnswer ?? featureAnswer;
+      catalogAnswer ??
+      locationAnswer ??
+      supermarketAnswer ??
+      priceAnswer ??
+      paymentAnswer ??
+      policyAnswer ??
+      featureAnswer;
     const rawReply = directAnswer ?? (await this.generate(input, intent));
     const asksForName = /\b(nombre completo|nombre y apellido|tu nombre)\b/i.test(
       rawReply,
@@ -649,6 +921,20 @@ export class ChatService {
 
     const wantsReservation =
       intent === "reservation" || asksForName || customerName !== null;
+
+    if (input.source === "audio" && customerName) {
+      return {
+        reply: `Escuché «${customerName}». ¿Está bien tu nombre? Si es correcto, decime «sí». Si no, escribilo de nuevo.`,
+        intent,
+        handoff: false,
+        model: this.llm?.model ?? "mock",
+        apartmentIds: [],
+        customerName,
+        wantsReservation: true,
+        wantsHuman: false,
+      };
+    }
+
     const handoff = customerName !== null && wantsReservation;
 
     let withHandoff = rawReply;

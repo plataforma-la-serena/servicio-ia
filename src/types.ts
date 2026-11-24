@@ -20,6 +20,7 @@ export interface ChatRequest {
   phone: string;
   history: ChatTurn[];
   apartments: ApartmentContext[];
+  source?: "text" | "audio";
 }
 
 export interface ChatResponse {
