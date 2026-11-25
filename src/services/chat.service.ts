@@ -781,188 +781,205 @@ function mentionedApartmentIds(
     .map((apartment) => apartment.id);
 }
 
+
+const NAME_REQUEST = /\b(nombre completo|nombre y apellido|tu nombre)\b/i;
+const NAME_CONFIRMATION =
+  /^(si|dale|correcto|esta bien|asi esta bien|confirmo|ok|claro)\b/;
+const HAS_WORDS = /[A-Za-zÁÉÍÓÚÑÜáéíóúñü]{3,}/;
+
+/** Devuelve la primera respuesta determinística no vacía, en orden de prioridad. */
+function firstAnswer(resolvers: Array<() => string | null>): string | null {
+  for (const resolve of resolvers) {
+    const answer = resolve();
+    if (answer) {
+      return answer;
+    }
+  }
+  return null;
+}
+
+function fallbackFor(message: string): string {
+  return isCityQuestion(message) ? CITY_FALLBACK : GENERIC_FALLBACK;
+}
+
+function applyHandoff(
+  rawReply: string,
+  customerName: string | null,
+  wantsReservation: boolean,
+): string {
+  if (customerName && wantsReservation) {
+    return handoffReply(rawReply, customerName);
+  }
+  if (!wantsReservation) {
+    return rawReply;
+  }
+
+  const cleaned = removePrematureHandoff(rawReply);
+  const alreadyAsksForName = NAME_REQUEST.test(cleaned);
+  return [cleaned, alreadyAsksForName ? "" : NAME_REQUEST_SUFFIX]
+    .filter(Boolean)
+    .join("\n\n");
+}
+
+function extractName(rawReply: string, input: ChatRequest): string | null {
+  const direct = extractCustomerName(input.message, input.history);
+  if (direct) {
+    return direct;
+  }
+
+  const fromReply = rawReply.match(
+    /(?:gracias|hola)[, ]+([A-ZÁÉÍÓÚÑÜ][a-záéíóúñü]+)/,
+  );
+  return fromReply?.[1] ?? null;
+}
+
+/** Quita el saludo inicial cuando ya hay historial y evita respuestas vacías. */
+function followUpReply(reply: string): string {
+  const stripped = stripLeadingGreeting(reply) || GENERIC_FALLBACK;
+  const [firstLine, ...rest] = stripped.split("\n");
+
+  if (rest.length > 0 && !HAS_WORDS.test(firstLine)) {
+    return ["¿En qué te puedo ayudar?", ...rest].join("\n").trim();
+  }
+  if (!HAS_WORDS.test(stripped)) {
+    return "¿En qué te puedo ayudar?";
+  }
+  return stripped;
+}
+
+
 export class ChatService {
   constructor(
     private readonly llm: LlmClient | null,
     private readonly config: AppConfig,
   ) {}
 
-  async reply(input: ChatRequest): Promise<ChatResponse> {
+  private baseResponse(
+    partial: { reply: string; intent: Intent } & Partial<ChatResponse>,
+  ): ChatResponse {
+    return {
+      handoff: false,
+      apartmentIds: [],
+      customerName: null,
+      wantsReservation: false,
+      wantsHuman: false,
+      ...partial,
+      model: this.llm?.model ?? "mock",
+    };
+  }
+
+  private humanReply(input: ChatRequest): ChatResponse | null {
     if (isHumanRequest(input.message)) {
-      return {
+      return this.baseResponse({
         reply: HUMAN_REQUEST_REPLY,
         intent: "question",
-        handoff: false,
-        model: this.llm?.model ?? "mock",
-        apartmentIds: [],
-        customerName: null,
-        wantsReservation: false,
-        wantsHuman: false,
-      };
+      });
     }
 
     if (isHumanConfirmation(input.message, input.history)) {
-      return {
+      return this.baseResponse({
         reply: HUMAN_CONFIRMED_REPLY,
         intent: "question",
-        handoff: false,
-        model: this.llm?.model ?? "mock",
-        apartmentIds: [],
-        customerName: null,
-        wantsReservation: false,
         wantsHuman: true,
-      };
+      });
     }
 
+    return null;
+  }
+
+  private pendingNameReply(input: ChatRequest): ChatResponse | null {
     const pendingName = extractPendingName(input.history);
+    if (!pendingName) {
+      return null;
+    }
 
-    if (pendingName) {
-      const answer = normalize(input.message).trim();
-      const affirmative =
-        /^(si|dale|correcto|esta bien|asi esta bien|confirmo|ok|claro)\b/.test(
-          answer,
-        );
-      const corrected = affirmative
-        ? null
-        : extractCorrectionName(input.message);
-      const finalName = corrected ?? (affirmative ? pendingName : null);
+    const answer = normalize(input.message).trim();
+    const affirmative = NAME_CONFIRMATION.test(answer);
+    const corrected = affirmative ? null : extractCorrectionName(input.message);
+    const finalName = corrected ?? (affirmative ? pendingName : null);
 
-      if (finalName) {
-        return {
-          reply: handoffReply("", finalName),
-          intent: "question",
-          handoff: true,
-          model: this.llm?.model ?? "mock",
-          apartmentIds: [],
-          customerName: finalName,
-          wantsReservation: true,
-          wantsHuman: false,
-        };
-      }
+    if (finalName) {
+      return this.baseResponse({
+        reply: handoffReply("", finalName),
+        intent: "question",
+        handoff: true,
+        customerName: finalName,
+        wantsReservation: true,
+      });
+    }
 
-      if (/^no\b/.test(answer)) {
-        return {
-          reply: "Escribime tu nombre completo, por favor.",
-          intent: "question",
-          handoff: false,
-          model: this.llm?.model ?? "mock",
-          apartmentIds: [],
-          customerName: pendingName,
-          wantsReservation: true,
-          wantsHuman: false,
-        };
-      }
+    if (/^no\b/.test(answer)) {
+      return this.baseResponse({
+        reply: "Escribime tu nombre completo, por favor.",
+        intent: "question",
+        customerName: pendingName,
+        wantsReservation: true,
+      });
+    }
+
+    return null;
+  }
+
+  async reply(input: ChatRequest): Promise<ChatResponse> {
+    const human = this.humanReply(input);
+    if (human) {
+      return human;
+    }
+
+    const pending = this.pendingNameReply(input);
+    if (pending) {
+      return pending;
     }
 
     const intent = detectIntent(input.message);
-    const catalogAnswer = catalogListReply(
-      input.message,
-      input.apartments,
-      this.config.catalogUrl,
-    );
-    const locationAnswer = catalogAnswer
-      ? null
-      : locationReply(input.message, input.apartments);
-    const supermarketAnswer =
-      catalogAnswer || locationAnswer
-        ? null
-        : supermarketReply(input.message);
-    const priceAnswer =
-      catalogAnswer || locationAnswer || supermarketAnswer
-        ? null
-        : priceReply(input.message, input.apartments);
-    const paymentAnswer =
-      catalogAnswer || locationAnswer || supermarketAnswer || priceAnswer
-        ? null
-        : paymentReply(input.message);
-    const policyAnswer =
-      catalogAnswer ||
-      locationAnswer ||
-      supermarketAnswer ||
-      priceAnswer ||
-      paymentAnswer
-        ? null
-        : policyReply(input.message);
-    const featureAnswer =
-      catalogAnswer ||
-      locationAnswer ||
-      supermarketAnswer ||
-      priceAnswer ||
-      paymentAnswer ||
-      policyAnswer
-        ? null
-        : featureReply(input.message, input.apartments);
-    const directAnswer =
-      catalogAnswer ??
-      locationAnswer ??
-      supermarketAnswer ??
-      priceAnswer ??
-      paymentAnswer ??
-      policyAnswer ??
-      featureAnswer;
+    const directAnswer = firstAnswer([
+      () =>
+        catalogListReply(
+          input.message,
+          input.apartments,
+          this.config.catalogUrl,
+        ),
+      () => locationReply(input.message, input.apartments),
+      () => supermarketReply(input.message),
+      () => priceReply(input.message, input.apartments),
+      () => paymentReply(input.message),
+      () => policyReply(input.message),
+      () => featureReply(input.message, input.apartments),
+    ]);
+
     const rawReply = directAnswer ?? (await this.generate(input, intent));
-    const asksForName = /\b(nombre completo|nombre y apellido|tu nombre)\b/i.test(
-      rawReply,
-    );
-    const customerNameFromMessage = extractCustomerName(
-      input.message,
-      input.history,
-    );
-    let customerName = customerNameFromMessage;
-
-    if (!customerName) {
-      const fromReply = rawReply.match(
-        /(?:gracias|hola)[, ]+([A-ZÁÉÍÓÚÑÜ][a-záéíóúñü]+)/,
-      );
-      if (fromReply) {
-        customerName = fromReply[1];
-      }
-    }
-
+    const customerName = extractName(rawReply, input);
     const wantsReservation =
-      intent === "reservation" || asksForName || customerName !== null;
+      intent === "reservation" ||
+      NAME_REQUEST.test(rawReply) ||
+      customerName !== null;
 
     if (input.source === "audio" && customerName) {
-      return {
+      return this.baseResponse({
         reply: `Escuché «${customerName}». ¿Está bien tu nombre? Si es correcto, decime «sí». Si no, escribilo de nuevo.`,
         intent,
-        handoff: false,
-        model: this.llm?.model ?? "mock",
-        apartmentIds: [],
         customerName,
         wantsReservation: true,
-        wantsHuman: false,
-      };
+      });
     }
 
     const handoff = customerName !== null && wantsReservation;
+    const withHandoff = applyHandoff(rawReply, customerName, wantsReservation);
 
-    let withHandoff = rawReply;
-
-    if (handoff && customerName) {
-      withHandoff = handoffReply(rawReply, customerName);
-    } else if (wantsReservation) {
-      const cleaned = removePrematureHandoff(rawReply);
-      const alreadyAsksForName =
-        /\b(nombre completo|nombre y apellido|tu nombre)\b/i.test(cleaned);
-
-      withHandoff = [cleaned, alreadyAsksForName ? "" : NAME_REQUEST_SUFFIX]
-        .filter(Boolean)
-        .join("\n\n");
-    }
-
-    let reply =
+    const keep =
       intent === "greeting" ||
       wantsReservation ||
       directAnswer !== null ||
       (!isCityQuestion(input.message) &&
-        (isCatalogRequest(input.message) || isApartmentRequest(input.message)))
-        ? withHandoff
-        : stripPitch(withHandoff) ||
-          (isCityQuestion(input.message) ? CITY_FALLBACK : GENERIC_FALLBACK);
+        (isCatalogRequest(input.message) ||
+          isApartmentRequest(input.message)));
+
+    let reply = keep
+      ? withHandoff
+      : stripPitch(withHandoff) || fallbackFor(input.message);
 
     if (!reply.trim()) {
-      reply = isCityQuestion(input.message) ? CITY_FALLBACK : GENERIC_FALLBACK;
+      reply = fallbackFor(input.message);
     }
 
     // Solo el saludo inicial agrega el catálogo. En el resto de las respuestas
@@ -974,28 +991,19 @@ export class ChatService {
     );
 
     if (input.history.length > 0) {
-      reply = stripLeadingGreeting(reply) || GENERIC_FALLBACK;
-
-      const [firstLine, ...rest] = reply.split("\n");
-      if (rest.length > 0 && !/[A-Za-zÁÉÍÓÚÑÜáéíóúñü]{3,}/.test(firstLine)) {
-        reply = ["¿En qué te puedo ayudar?", ...rest].join("\n").trim();
-      } else if (!/[A-Za-zÁÉÍÓÚÑÜáéíóúñü]{3,}/.test(reply)) {
-        reply = "¿En qué te puedo ayudar?";
-      }
+      reply = followUpReply(reply);
     }
 
     reply = normalizePrices(reply);
 
-    return {
+    return this.baseResponse({
       reply,
       intent,
       handoff,
-      model: this.llm?.model ?? "mock",
       apartmentIds: mentionedApartmentIds(reply, input.apartments),
       customerName,
       wantsReservation,
-      wantsHuman: false,
-    };
+    });
   }
 
   private async generate(input: ChatRequest, intent: Intent): Promise<string> {

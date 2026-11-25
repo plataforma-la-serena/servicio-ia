@@ -13,6 +13,11 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
+/** Salida del simulador: stdout explícito, no logging de depuración. */
+function out(line = "") {
+  process.stdout.write(`${line}\n`);
+}
+
 const IA_URL = process.env.IA_URL ?? "http://localhost:3102/chat";
 const API_URL = process.env.API_CENTRAL_URL ?? "http://localhost:3101";
 const ENV_PATH =
@@ -775,8 +780,8 @@ async function main() {
     headers: { "x-service-token": env.INTERNAL_API_TOKEN },
   });
   const apartments = await contextResponse.json();
-  console.log(`Contexto: ${apartments.length} departamento(s) activo(s)`);
-  console.log(
+  out(`Contexto: ${apartments.length} departamento(s) activo(s)`);
+  out(
     `Personas: ${PERSONAS} | mensajes estimados: ${Math.round(PERSONAS * 3.3)} | concurrencia: ${CONCURRENCY}`,
   );
 
@@ -799,7 +804,7 @@ async function main() {
     const minutes = (Date.now() - startedAt) / 60000;
     const rate = allResults.length / Math.max(minutes, 0.1);
     if (done % (CONCURRENCY * 5) === 0 || done === personas.length) {
-      console.log(
+      out(
         `Personas ${done}/${personas.length} | ${allResults.length} llamadas | ${rate.toFixed(0)}/min`,
       );
     }
@@ -828,29 +833,29 @@ async function main() {
 
   writeFileSync(OUTPUT, JSON.stringify(report, null, 2));
 
-  console.log(`\nReporte: ${OUTPUT}`);
-  console.log(`Llamadas: ${allResults.length} | Fallos: ${failures.length}`);
-  console.log("Por tipo:");
+  out(`\nReporte: ${OUTPUT}`);
+  out(`Llamadas: ${allResults.length} | Fallos: ${failures.length}`);
+  out("Por tipo:");
   for (const [flag, count] of Object.entries(byFlag).sort(
     (a, b) => b[1] - a[1],
   )) {
-    console.log(`  ${flag}: ${count}`);
+    out(`  ${flag}: ${count}`);
   }
 
-  console.log("\nTono:");
-  console.log(
+  out("\nTono:");
+  out(
     `  amable ${(summary.toneRate.amable * 100).toFixed(1)}% | neutral ${(
       summary.toneRate.neutral * 100
     ).toFixed(1)}% | sobrio ${(summary.toneRate.sobrio * 100).toFixed(
       1,
     )}% | colorido ${(summary.toneRate.colorido * 100).toFixed(1)}%`,
   );
-  console.log(
+  out(
     `  largo promedio ${summary.avgLength} caracteres | p95 ${summary.p95Length}`,
   );
-  console.log("\nPor personalidad:");
+  out("\nPor personalidad:");
   for (const [key, entry] of Object.entries(summary.byArchetype)) {
-    console.log(
+    out(
       `  ${key} (${entry.turns} turnos): largo ${entry.avgLength} | emoji ${(
         entry.emojiRate * 100
       ).toFixed(0)}% | calidez ${(entry.warmRate * 100).toFixed(0)}% | sobrio ${(
@@ -859,24 +864,24 @@ async function main() {
     );
   }
 
-  console.log("\nEjemplos sobrios:");
+  out("\nEjemplos sobrios:");
   for (const result of sample(
     allResults,
     (item) => item.tone.bucket === "sobrio",
     6,
   )) {
-    console.log(`\n[${result.archetype}] ${result.message}`);
-    console.log(`  < ${String(result.reply).replace(/\n/g, " ").slice(0, 300)}`);
+    out(`\n[${result.archetype}] ${result.message}`);
+    out(`  < ${String(result.reply).replace(/\n/g, " ").slice(0, 300)}`);
   }
 
-  console.log("\nEjemplos coloridos:");
+  out("\nEjemplos coloridos:");
   for (const result of sample(
     allResults,
     (item) => item.tone.bucket === "colorido",
     6,
   )) {
-    console.log(`\n[${result.archetype}] ${result.message}`);
-    console.log(`  < ${String(result.reply).replace(/\n/g, " ").slice(0, 300)}`);
+    out(`\n[${result.archetype}] ${result.message}`);
+    out(`  < ${String(result.reply).replace(/\n/g, " ").slice(0, 300)}`);
   }
 }
 
