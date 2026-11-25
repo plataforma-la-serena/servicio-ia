@@ -7,6 +7,8 @@
     "build": "tsc -p tsconfig.build.json",
     "start": "node dist/server.js",
     "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "coverage": "vitest run --coverage",
     "simulate": "node scripts/simulate-personas.mjs"
   },
   "dependencies": {
@@ -16,7 +18,9 @@
   },
   "devDependencies": {
     "@types/node": "26.6.6",
+    "@vitest/coverage-v8": "^5.1.2",
     "tsx": "4.23.15",
-    "typescript": "5.9.3"
+    "typescript": "5.9.3",
+    "vitest": "^5.1.2"
   }
 }
