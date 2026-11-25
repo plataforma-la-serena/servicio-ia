@@ -309,7 +309,8 @@ function extractCorrectionName(message: string): string | null {
   if (explicit) {
     candidate = explicit[1];
   } else {
-    const rest = text.replace(/^no[,.;\s]+/i, "").trim();
+    // Un "no" seco no es un nombre: solo se toma lo que venga después.
+    const rest = text.replace(/^no\b[,.;\s]*/i, "").trim();
     if (
       rest &&
       rest.split(/\s+/).length <= 4 &&
