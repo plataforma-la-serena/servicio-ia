@@ -179,7 +179,7 @@ function withCatalogLink(
 }
 
 const GREETING_PREFIX =
-  /^(?:¡)?(?:hola|holis|holi|buenas(?:\s+(?:tardes|noches|d[ií]as))?|buen d[ií]a|buenos d[ií]as|qu[eé] tal|hey)\b(?:\s+(?:de nuevo|nuevamente))?/i;
+  /^(?:¡)?(?:hola|holis|holi|buenas(?:\s+(?:tardes|noches|d[ií]as))?|buen d[ií]a|buenos d[ií]as|qu[eé] tal|hey)\b(?:\s+(?:de nuevo|nuevamente))?[\s,.;:!¡-]*/i;
 
 /**
  * Quita el saludo inicial cuando la conversación ya venía hablando. El bot no

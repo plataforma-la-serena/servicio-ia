@@ -197,3 +197,25 @@ describe("ChatService.reply", () => {
     expect(result.intent).toBe("off_topic");
   });
 });
+
+describe("ChatService con historial y LLM", () => {
+  it("no deja comas sueltas al quitar el saludo inicial", async () => {
+    const llm = {
+      model: "test",
+      complete: async () =>
+        "Hola, soy el asistente de Alquileres 4 Esquinas.\n¿En qué te puedo ayudar?",
+    };
+    const withLlm = new ChatService(llm, config);
+    const result = await withLlm.reply(
+      request({
+        message: "contame algo",
+        history: [
+          { role: "user", content: "hola" },
+          { role: "assistant", content: "¡Hola! ¿En qué te ayudo?" },
+        ],
+      }),
+    );
+    expect(result.reply.startsWith("soy el asistente")).toBe(true);
+    expect(result.reply).not.toMatch(/^\s*[,.;:¡!]/);
+  });
+});
